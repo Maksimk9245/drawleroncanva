@@ -9,18 +9,9 @@
       @mouseleave="onPointerUp"
       @contextmenu.prevent
   >
-    <!-- Фон -->
     <canvas ref="bgCanvas" class="canvas bg-canvas"></canvas>
-
-    <!-- Рисование -->
     <canvas ref="drawCanvas" class="canvas draw-canvas"></canvas>
-
-    <!-- Кнопка показа инструментов -->
-    <button class="tools-toggle" @click="showTools = !showTools">
-      🛠️ Инструменты
-    </button>
-
-    <!-- Панель инструментов -->
+    <button class="tools-toggle" @click="showTools = !showTools">🛠️ Инструменты</button>
     <div class="toolbar" :class="{ visible: showTools }">
       <div class="tools-list">
         <button
@@ -32,49 +23,54 @@
           {{ tool }}
         </button>
       </div>
-
       <label class="upload-btn">
         Загрузить изображение
         <input type="file" accept="image/*" @change="loadImage" />
       </label>
-
       <input type="color" v-model="color" />
       <input type="range" min="1" max="30" v-model.number="size" />
-
       <button class="clear-btn" @click="clearDrawing">Очистить</button>
       <button class="undo-btn" @click="undoAction" :disabled="lines.length === 0">Отменить</button>
-      <button class="redo-btn" @click="redoAction" :disabled="historyRedo.length === 0">Повторить</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
+
 const wrapper = ref(null);
 const bgCanvas = ref(null);
 const drawCanvas = ref(null);
+
 const showTools = ref(false);
 const tools = ["Карандаш", "Ластик"];
 const currentTool = ref("Карандаш");
 const color = ref("#000000");
 const size = ref(5);
+
 const lines = ref([]);
 const historyRedo = ref([]);
+
 let zoom = 1;
 const minZoom = 0.1;
 const maxZoom = 10;
+
 let offsetX = 0;
 let offsetY = 0;
+
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
+
 let isDrawing = false;
 let currentLine = null;
+
 let img = null;
+
 function resizeCanvases() {
   if (!wrapper.value) return;
   const w = wrapper.value.clientWidth;
   const h = wrapper.value.clientHeight;
-  [bgCanvas.value, drawCanvas.value].forEach((canvas) => {
+  [bgCanvas.value, drawCanvas.value].forEach(canvas => {
     if (!canvas) return;
     canvas.width = w;
     canvas.height = h;
@@ -84,18 +80,19 @@ function resizeCanvases() {
   drawBackground();
   redrawDrawing();
 }
+
 function drawBackground() {
   const ctx = bgCanvas.value.getContext("2d");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, bgCanvas.value.width, bgCanvas.value.height);
   ctx.setTransform(zoom, 0, 0, zoom, offsetX, offsetY);
-  if (img) {
-    ctx.drawImage(img, 0, 0);
-  } else {
+  if (img) ctx.drawImage(img, 0, 0);
+  else {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, bgCanvas.value.width / zoom, bgCanvas.value.height / zoom);
   }
 }
+
 function redrawDrawing() {
   const ctx = drawCanvas.value.getContext("2d");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -112,7 +109,6 @@ function redrawDrawing() {
       const px = p.x * zoom + offsetX;
       const py = p.y * zoom + offsetY;
       ctx.fillStyle = line.color;
-      ctx.beginPath();
       ctx.arc(px, py, line.size / 2, 0, Math.PI * 2);
       ctx.fill();
     } else {
@@ -126,12 +122,10 @@ function redrawDrawing() {
       ctx.stroke();
     }
   }
-
   if (isDrawing && currentLine && currentLine.points.length) {
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
     ctx.beginPath();
-
     if (currentLine.points.length === 1) {
       const p = currentLine.points[0];
       const px = p.x * zoom + offsetX;
@@ -151,13 +145,16 @@ function redrawDrawing() {
     }
   }
 }
+
 function getMousePos(e) {
   if (!drawCanvas.value) return { x: 0, y: 0 };
   const rect = drawCanvas.value.getBoundingClientRect();
-  const x = (e.clientX - rect.left - offsetX) / zoom;
-  const y = (e.clientY - rect.top - offsetY) / zoom;
-  return { x, y };
+  return {
+    x: (e.clientX - rect.left - offsetX) / zoom,
+    y: (e.clientY - rect.top - offsetY) / zoom
+  };
 }
+
 function onPointerDown(e) {
   if (e.button === 2) {
     isPanning = true;
@@ -177,6 +174,7 @@ function onPointerDown(e) {
     }
   }
 }
+
 function onPointerMove(e) {
   if (isPanning) {
     const dx = e.clientX - panStart.x;
@@ -196,8 +194,9 @@ function onPointerMove(e) {
 
 function onPointerUp() {
   if (isDrawing) {
-    if (currentLine.points.length > 0) {
+    if (currentLine.points.length > 1) {
       lines.value.push(currentLine);
+      historyRedo.value = [];
     }
     currentLine = null;
   }
@@ -205,23 +204,21 @@ function onPointerUp() {
   isPanning = false;
   redrawDrawing();
 }
+
 function handleWheel(e) {
   const rect = bgCanvas.value.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
-
   const prevX = (mouseX - offsetX) / zoom;
   const prevY = (mouseY - offsetY) / zoom;
-
   zoom *= e.deltaY < 0 ? 1.1 : 0.9;
   zoom = Math.min(Math.max(zoom, minZoom), maxZoom);
-
   offsetX = mouseX - prevX * zoom;
   offsetY = mouseY - prevY * zoom;
-
   drawBackground();
   redrawDrawing();
 }
+
 function loadImage(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -236,6 +233,7 @@ function loadImage(e) {
   };
   image.src = URL.createObjectURL(file);
 }
+
 function clearDrawing() {
   lines.value = [];
   historyRedo.value = [];
@@ -249,21 +247,17 @@ function selectTool(tool) {
 
 function undoAction() {
   if (lines.value.length === 0) return;
-  const last = lines.value.pop();
-  historyRedo.value.push(last);
-  console.log('undoAction', lines.value.length);
+  const removed = lines.value.pop();
+  if (removed) {
+    historyRedo.value.push(removed);
+  }
   redrawDrawing();
 }
-function redoAction() {
-  if (historyRedo.value.length === 0) return;
-  const recovered = historyRedo.value.pop();
-  lines.value.push(recovered);
-  console.log('redoAction, линий стало:', lines.value.length);
-  redrawDrawing();
-}
+//TODO Кнопка Redo для возврата
 function onResize() {
   resizeCanvases();
 }
+
 onMounted(() => {
   resizeCanvases();
   window.addEventListener("resize", onResize);
@@ -273,6 +267,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onResize);
 });
 </script>
+
 <style scoped>
 .draw-app {
   position: relative;
@@ -453,26 +448,5 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .undo-btn:hover:not(:disabled) {
   background: #ffeaea;
-}
-
-.redo-btn {
-  background: #f5fff5;
-  border: none;
-  padding: 10px;
-  font-weight: bold;
-  font-size: 14px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.3s ease;
-  color: #28a745;
-  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.2);
-  margin-top: 4px;
-}
-.redo-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.redo-btn:hover:not(:disabled) {
-  background: #dff5df;
 }
 </style>
