@@ -34,7 +34,6 @@
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from "vue";
 
@@ -155,24 +154,56 @@ function getMousePos(e) {
   };
 }
 
+function eraseAtPosition(pos) {
+  const radius = size.value / 2;
+  lines.value = lines.value.filter(line => {
+    return !line.points.some(p => {
+      const dx = p.x - pos.x;
+      const dy = p.y - pos.y;
+      return dx * dx + dy * dy < radius * radius;
+    });
+  });
+}
+
 function onPointerDown(e) {
   if (e.button === 2) {
     isPanning = true;
     panStart.x = e.clientX;
     panStart.y = e.clientY;
   } else if (e.button === 0) {
-    if (currentTool.value === "Карандаш" || currentTool.value === "Ластик") {
+    const pos = getMousePos(e);
+    if (currentTool.value === "Ластик") {
+      eraseAtPosition(pos);
       isDrawing = true;
-      const pos = getMousePos(e);
+    } else if (currentTool.value === "Карандаш") {
+      isDrawing = true;
       currentLine = {
         points: [pos],
-        color: currentTool.value === "Ластик" ? "#FFFFFF" : color.value,
+        color: color.value,
         size: size.value,
       };
       historyRedo.value = [];
-      redrawDrawing();
+    }
+    redrawDrawing();
+  }
+}
+function eraseAtPoint(pos) {
+  const eraseRadius = 10;
+  const updatedLines = [];
+
+  for (const line of lines.value) {
+    const remainingPoints = line.points.filter(p => {
+      const dx = p.x - pos.x;
+      const dy = p.y - pos.y;
+      return dx * dx + dy * dy > eraseRadius * eraseRadius;
+    });
+
+    if (remainingPoints.length > 1) {
+      updatedLines.push({ ...line, points: remainingPoints });
     }
   }
+
+  lines.value = updatedLines;
 }
 
 function onPointerMove(e) {
@@ -187,19 +218,24 @@ function onPointerMove(e) {
     redrawDrawing();
   } else if (isDrawing) {
     const pos = getMousePos(e);
-    currentLine.points.push(pos);
+    if (currentTool.value === 'Ластик') {
+      eraseAtPoint(pos);
+    } else {
+      currentLine.points.push(pos);
+    }
     redrawDrawing();
   }
 }
 
+
 function onPointerUp() {
-  if (isDrawing) {
+  if (isDrawing && currentTool.value === "Карандаш") {
     if (currentLine.points.length > 1) {
       lines.value.push(currentLine);
       historyRedo.value = [];
     }
-    currentLine = null;
   }
+  currentLine = null;
   isDrawing = false;
   isPanning = false;
   redrawDrawing();
@@ -253,7 +289,7 @@ function undoAction() {
   }
   redrawDrawing();
 }
-//TODO Кнопка Redo для возврата
+
 function onResize() {
   resizeCanvases();
 }
@@ -267,7 +303,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onResize);
 });
 </script>
-
 <style scoped>
 .draw-app {
   position: relative;
