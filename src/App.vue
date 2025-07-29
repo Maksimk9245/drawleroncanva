@@ -253,7 +253,7 @@ function undoAction() {
   }
   redrawDrawing();
 }
-//TODO Кнопка Redo для возврата
+//TODO Кнопка Redo для возврата!
 function onResize() {
   resizeCanvases();
 }
