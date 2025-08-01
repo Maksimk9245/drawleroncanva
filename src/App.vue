@@ -108,6 +108,7 @@ function redrawDrawing() {
       const p = line.points[0];
       const px = p.x * zoom + offsetX;
       const py = p.y * zoom + offsetY;
+      ctx.line=line.size/zoom
       ctx.fillStyle = line.color;
       ctx.arc(px, py, line.size / 2, 0, Math.PI * 2);
       ctx.fill();
@@ -122,9 +123,13 @@ function redrawDrawing() {
       ctx.stroke();
     }
   }
-  if (isDrawing && currentLine && currentLine.points.length) {
+  if (isDrawing &&
+      currentLine &&
+      currentLine.points.length &&
+      currentTool.value !== "Ластик") {
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
+    ctx.line=line.size/zoom
     ctx.beginPath();
     if (currentLine.points.length === 1) {
       const p = currentLine.points[0];
@@ -161,21 +166,25 @@ function onPointerDown(e) {
     panStart.x = e.clientX;
     panStart.y = e.clientY;
   } else if (e.button === 0) {
-    if (currentTool.value === "Карандаш" || currentTool.value === "Ластик") {
+    const pos = getMousePos(e);
+    if (currentTool.value === "Карандаш") {
       isDrawing = true;
-      const pos = getMousePos(e);
       currentLine = {
         points: [pos],
-        color: currentTool.value === "Ластик" ? "#FFFFFF" : color.value,
+        color: color.value,
         size: size.value,
       };
       historyRedo.value = [];
+      redrawDrawing();
+    } else if (currentTool.value === "Ластик") {
+      isDrawing = true;
       redrawDrawing();
     }
   }
 }
 
-function onPointerMove(e) {
+const pos=getMousePos(e);
+function onPointerMove(e){
   if (isPanning) {
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
@@ -186,15 +195,23 @@ function onPointerMove(e) {
     drawBackground();
     redrawDrawing();
   } else if (isDrawing) {
-    const pos = getMousePos(e);
-    currentLine.points.push(pos);
+   if(currentTool.value === "Ластик"){
+     lines.value=lines.value.filter((line)=>{
+       return !line.points.some((p)=>{
+         const dx=p.x-pos.x;
+         const dy=p.y-pos.y;
+         return Math.sqrt(dx*dx+dy*dy)<size.value/zoom;
+       });
+     });
     redrawDrawing();
-  }
+    return;
+  }}
+   currentLine.points.push(pos);
 }
 
 function onPointerUp() {
   if (isDrawing) {
-    if (currentLine.points.length > 1) {
+    if (currentLine && currentLine.points.length > 1 && currentTool.value!=="Ластик") {
       lines.value.push(currentLine);
       historyRedo.value = [];
     }
