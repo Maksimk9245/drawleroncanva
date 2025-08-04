@@ -11,6 +11,9 @@
   >
     <canvas ref="bgCanvas" class="canvas bg-canvas"></canvas>
     <canvas ref="drawCanvas" class="canvas draw-canvas"></canvas>
+    <canvas ref="drawingCanvas" class="canvas draw-canvas"></canvas>
+    <canvas ref="laso" class="canvas lass-canvas"></canvas>
+
     <button class="tools-toggle" @click="showTools = !showTools">🛠️ Инструменты</button>
     <div class="toolbar" :class="{ visible: showTools }">
       <div class="tools-list">
@@ -31,6 +34,7 @@
       <input type="range" min="1" max="30" v-model.number="size" />
       <button class="clear-btn" @click="clearDrawing">Очистить</button>
       <button class="undo-btn" @click="undoAction" :disabled="lines.length === 0">Отменить</button>
+      <button @click="downloadImage">Скачать изображение</button>
     </div>
   </div>
 </template>
@@ -41,15 +45,19 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 const wrapper = ref(null);
 const bgCanvas = ref(null);
 const drawCanvas = ref(null);
+const laso = ref(null);
 
 const showTools = ref(false);
-const tools = ["Карандаш", "Ластик"];
+const tools = ["Карандаш", "Ластик", "Лассо"];
 const currentTool = ref("Карандаш");
 const color = ref("#000000");
 const size = ref(5);
 
 const lines = ref([]);
 const historyRedo = ref([]);
+
+const lassoPoints = ref([]);
+const isLassoActive = ref(false);
 
 let zoom = 1;
 const minZoom = 0.1;
@@ -70,7 +78,7 @@ function resizeCanvases() {
   if (!wrapper.value) return;
   const w = wrapper.value.clientWidth;
   const h = wrapper.value.clientHeight;
-  [bgCanvas.value, drawCanvas.value].forEach(canvas => {
+  [bgCanvas.value, drawCanvas.value, laso.value].forEach(canvas => {
     if (!canvas) return;
     canvas.width = w;
     canvas.height = h;
@@ -79,6 +87,7 @@ function resizeCanvases() {
   });
   drawBackground();
   redrawDrawing();
+  drawLassoPath();
 }
 
 function drawBackground() {
@@ -99,6 +108,7 @@ function redrawDrawing() {
   ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+
   for (const line of lines.value) {
     if (!line.points.length) continue;
     ctx.strokeStyle = line.color;
@@ -108,7 +118,6 @@ function redrawDrawing() {
       const p = line.points[0];
       const px = p.x * zoom + offsetX;
       const py = p.y * zoom + offsetY;
-      ctx.line=line.size/zoom
       ctx.fillStyle = line.color;
       ctx.arc(px, py, line.size / 2, 0, Math.PI * 2);
       ctx.fill();
@@ -123,13 +132,13 @@ function redrawDrawing() {
       ctx.stroke();
     }
   }
+
   if (isDrawing &&
       currentLine &&
       currentLine.points.length &&
       currentTool.value !== "Ластик") {
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
-    ctx.line=line.size/zoom
     ctx.beginPath();
     if (currentLine.points.length === 1) {
       const p = currentLine.points[0];
@@ -149,6 +158,24 @@ function redrawDrawing() {
       ctx.stroke();
     }
   }
+}
+
+function drawLassoPath() {
+  const ctx = laso.value.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, laso.value.width, laso.value.height);
+  if (!lassoPoints.value.length) return;
+  ctx.beginPath();
+  ctx.strokeStyle = "rgba(0, 0, 255, 0.8)";
+  ctx.lineWidth = 1;
+  const start = lassoPoints.value[0];
+  ctx.moveTo(start.x * zoom + offsetX, start.y * zoom + offsetY);
+  for (let i = 1; i < lassoPoints.value.length; i++) {
+    const p = lassoPoints.value[i];
+    ctx.lineTo(p.x * zoom + offsetX, p.y * zoom + offsetY);
+  }
+  ctx.closePath();
+  ctx.stroke();
 }
 
 function getMousePos(e) {
@@ -179,12 +206,17 @@ function onPointerDown(e) {
     } else if (currentTool.value === "Ластик") {
       isDrawing = true;
       redrawDrawing();
+    } else if (currentTool.value === "Лассо") {
+      isDrawing = true;
+      lassoPoints.value = [pos];
+      drawLassoPath();
     }
   }
 }
 
-const pos=getMousePos(e);
-function onPointerMove(e){
+function onPointerMove(e) {
+  const pos = getMousePos(e);
+
   if (isPanning) {
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
@@ -194,24 +226,33 @@ function onPointerMove(e){
     offsetY += dy;
     drawBackground();
     redrawDrawing();
+    drawLassoPath();
   } else if (isDrawing) {
-   if(currentTool.value === "Ластик"){
-     lines.value=lines.value.filter((line)=>{
-       return !line.points.some((p)=>{
-         const dx=p.x-pos.x;
-         const dy=p.y-pos.y;
-         return Math.sqrt(dx*dx+dy*dy)<size.value/zoom;
-       });
-     });
-    redrawDrawing();
-    return;
-  }}
-   currentLine.points.push(pos);
+    if (currentTool.value === "Ластик") {
+      lines.value = lines.value.filter((line) => {
+        return !line.points.some((p) => {
+          const dx = p.x - pos.x;
+          const dy = p.y - pos.y;
+          return Math.sqrt(dx * dx + dy * dy) < size.value / zoom;
+        });
+      });
+      redrawDrawing();
+      return;
+    }
+    if (currentTool.value === "Лассо") {
+      lassoPoints.value.push(pos);
+      drawLassoPath();
+    }
+    if (currentLine) {
+      currentLine.points.push(pos);
+      redrawDrawing();
+    }
+  }
 }
 
 function onPointerUp() {
   if (isDrawing) {
-    if (currentLine && currentLine.points.length > 1 && currentTool.value!=="Ластик") {
+    if (currentLine && currentLine.points.length > 1 && currentTool.value !== "Ластик" && currentTool.value !== "Лассо") {
       lines.value.push(currentLine);
       historyRedo.value = [];
     }
@@ -219,6 +260,7 @@ function onPointerUp() {
   }
   isDrawing = false;
   isPanning = false;
+  drawLassoPath();
   redrawDrawing();
 }
 
@@ -234,6 +276,7 @@ function handleWheel(e) {
   offsetY = mouseY - prevY * zoom;
   drawBackground();
   redrawDrawing();
+  drawLassoPath();
 }
 
 function loadImage(e) {
@@ -256,12 +299,26 @@ function clearDrawing() {
   historyRedo.value = [];
   redrawDrawing();
 }
-
 function selectTool(tool) {
   currentTool.value = tool;
   showTools.value = false;
 }
+function downloadImage() {
+  const bg = bgCanvas.value;
+  const draw = drawCanvas.value;
+  if (!bg || !draw) return;
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = bg.width;
+  tempCanvas.height = bg.height;
+  const ctx = tempCanvas.getContext("2d");
+  ctx.drawImage(bg, 0, 0);
+  ctx.drawImage(draw, 0, 0);
 
+  const link = document.createElement("a");
+  link.download = "drawing.png";
+  link.href = tempCanvas.toDataURL("image/png");
+  link.click();
+}
 function undoAction() {
   if (lines.value.length === 0) return;
   const removed = lines.value.pop();
@@ -270,11 +327,9 @@ function undoAction() {
   }
   redrawDrawing();
 }
-//TODO Кнопка Redo для возврата!
 function onResize() {
   resizeCanvases();
 }
-
 onMounted(() => {
   resizeCanvases();
   window.addEventListener("resize", onResize);
@@ -284,7 +339,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onResize);
 });
 </script>
-
 <style scoped>
 .draw-app {
   position: relative;
@@ -465,5 +519,11 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .undo-btn:hover:not(:disabled) {
   background: #ffeaea;
+}
+canvas {
+  border: 1px solid black;
+}
+button {
+  margin-top: 10px;
 }
 </style>
