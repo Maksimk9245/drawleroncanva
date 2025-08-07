@@ -12,8 +12,8 @@
     <canvas ref="bgCanvas" class="canvas bg-canvas"></canvas>
     <canvas ref="drawCanvas" class="canvas draw-canvas"></canvas>
     <canvas ref="drawingCanvas" class="canvas draw-canvas"></canvas>
-    <canvas ref="laso" class="canvas lass-canvas"></canvas>
-
+    <canvas ref="laso" class="lasso-canvas"></canvas>
+    <button @click="cutLassoArea" :disabled="lassoPoints.lenght<3">Лассо</button>
     <button class="tools-toggle" @click="showTools = !showTools">🛠️ Инструменты</button>
     <div class="toolbar" :class="{ visible: showTools }">
       <div class="tools-list">
@@ -133,10 +133,7 @@ function redrawDrawing() {
     }
   }
 
-  if (isDrawing &&
-      currentLine &&
-      currentLine.points.length &&
-      currentTool.value !== "Ластик") {
+  if (isDrawing && currentLine && currentLine.points.length && currentTool.value !== "Ластик")  {
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
     ctx.beginPath();
@@ -167,7 +164,7 @@ function drawLassoPath() {
   if (!lassoPoints.value.length) return;
   ctx.beginPath();
   ctx.strokeStyle = "rgba(0, 0, 255, 0.8)";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   const start = lassoPoints.value[0];
   ctx.moveTo(start.x * zoom + offsetX, start.y * zoom + offsetY);
   for (let i = 1; i < lassoPoints.value.length; i++) {
@@ -241,6 +238,8 @@ function onPointerMove(e) {
     }
     if (currentTool.value === "Лассо") {
       lassoPoints.value.push(pos);
+      drawBackground();
+      redrawDrawing();
       drawLassoPath();
     }
     if (currentLine) {
@@ -249,8 +248,7 @@ function onPointerMove(e) {
     }
   }
 }
-
-function onPointerUp() {
+function onPointerUp(e) {
   if (isDrawing) {
     if (currentLine && currentLine.points.length > 1 && currentTool.value !== "Ластик" && currentTool.value !== "Лассо") {
       lines.value.push(currentLine);
@@ -318,6 +316,38 @@ function downloadImage() {
   link.download = "drawing.png";
   link.href = tempCanvas.toDataURL("image/png");
   link.click();
+}
+function cutLassoArea() {
+  if (!img || lassoPoints.value.length < 3) return;
+  const w = bgCanvas.value.width;
+  const h = bgCanvas.value.height;
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = w;
+  tempCanvas.height = h;
+  const tempCtx = tempCanvas.getContext("2d");
+  tempCtx.setTransform(zoom, 0, 0, zoom, offsetX, offsetY);
+  tempCtx.drawImage(img, 0, 0);
+  tempCtx.save();
+  tempCtx.beginPath();
+  const first = lassoPoints.value[0];
+  tempCtx.moveTo(first.x, first.y);
+  for (let i = 1; i < lassoPoints.value.length; i++) {
+    const p = lassoPoints.value[i];
+    tempCtx.lineTo(p.x, p.y);
+  }
+  tempCtx.closePath();
+  tempCtx.clip();
+  tempCtx.clearRect(0, 0, w, h);
+  tempCtx.restore();
+  const newImage = new Image();
+  newImage.onload = () => {
+    img = newImage;
+    drawBackground();
+    redrawDrawing();
+    lassoPoints.value = [];
+    drawLassoPath();
+  };
+  newImage.src = tempCanvas.toDataURL();
 }
 function undoAction() {
   if (lines.value.length === 0) return;
@@ -520,10 +550,19 @@ input[type="range"]::-webkit-slider-thumb {
 .undo-btn:hover:not(:disabled) {
   background: #ffeaea;
 }
+.lasso-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 999; /* выше, чем у остальных холстов */
+  pointer-events: none; /* чтобы не перехватывал мышку */
+}
+
 canvas {
   border: 1px solid black;
 }
 button {
   margin-top: 10px;
 }
+
 </style>
