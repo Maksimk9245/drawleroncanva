@@ -399,3 +399,194 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onResize);
 });
 </script>
+<style scoped>
+.draw-app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  user-select: none;
+  background: #fdfdfd;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+}
+
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  border: 1px solid black;
+}
+
+.bg-canvas {
+  z-index: 0;
+  background: #fff;
+}
+
+.draw-canvas {
+  z-index: 1;
+  cursor: crosshair;
+}
+
+.lasso-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10; /* выше остальных */
+  pointer-events: none; /* не блокируем мышь */
+}
+
+.tools-toggle {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  z-index: 11;
+  box-shadow: 0 4px 12px rgba(53, 122, 189, 0.5);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.tools-toggle:hover {
+  background: linear-gradient(135deg, #357abd, #285a8f);
+}
+
+.toolbar {
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  width: 260px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 10;
+}
+.toolbar.visible {
+  display: flex;
+}
+
+.tools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.tools-list button {
+  flex: 1 0 45%;
+  padding: 8px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-align: center;
+}
+.tools-list button.active,
+.tools-list button:hover {
+  background: #4a90e2;
+  color: white;
+}
+
+input[type="color"],
+input[type="range"] {
+  width: 100%;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+input[type="range"] {
+  padding: 0;
+  margin-top: 6px;
+  appearance: none;
+  background: #eee;
+  height: 8px;
+  border-radius: 6px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: red;
+  cursor: pointer;
+  border: none;
+  margin-top: -5px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+}
+
+.upload-btn {
+  position: relative;
+  display: inline-block;
+  background: #4a90e2;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px;
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.3s ease;
+}
+.upload-btn:hover {
+  background: #357abd;
+}
+.upload-btn input[type="file"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.clear-btn {
+  background: #f2f6ff;
+  border: none;
+  padding: 10px;
+  font-weight: bold;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.clear-btn:hover {
+  background: #e0ebff;
+}
+
+.undo-btn {
+  background: #fff5f5;
+  border: none;
+  padding: 10px;
+  font-weight: bold;
+  font-size: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  color: #d9534f;
+  box-shadow: 0 2px 6px rgba(217, 83, 79, 0.2);
+}
+.undo-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.undo-btn:hover:not(:disabled) {
+  background: #ffeaea;
+}
+</style>
