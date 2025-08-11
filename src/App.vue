@@ -11,10 +11,11 @@
   >
     <canvas ref="bgCanvas" class="canvas bg-canvas"></canvas>
     <canvas ref="drawCanvas" class="canvas draw-canvas"></canvas>
-    <canvas ref="drawingCanvas" class="canvas draw-canvas"></canvas>
-    <canvas ref="laso" class="lasso-canvas"></canvas>
-    <button @click="cutLassoArea" :disabled="lassoPoints.lenght<3">Лассо</button>
+    <canvas ref="lasso" class="lasso-canvas"></canvas>
+
+    <button @click="cutLassoArea" :disabled="lassoPoints.length < 3">Вырезать лассо</button>
     <button class="tools-toggle" @click="showTools = !showTools">🛠️ Инструменты</button>
+
     <div class="toolbar" :class="{ visible: showTools }">
       <div class="tools-list">
         <button
@@ -45,7 +46,7 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 const wrapper = ref(null);
 const bgCanvas = ref(null);
 const drawCanvas = ref(null);
-const laso = ref(null);
+const lasso = ref(null);
 
 const showTools = ref(false);
 const tools = ["Карандаш", "Ластик", "Лассо"];
@@ -57,7 +58,10 @@ const lines = ref([]);
 const historyRedo = ref([]);
 
 const lassoPoints = ref([]);
-const isLassoActive = ref(false);
+const isDrawing = ref(false);
+const isPanning = ref(false);
+
+let currentLine = null;
 
 let zoom = 1;
 const minZoom = 0.1;
@@ -66,11 +70,7 @@ const maxZoom = 10;
 let offsetX = 0;
 let offsetY = 0;
 
-let isPanning = false;
 let panStart = { x: 0, y: 0 };
-
-let isDrawing = false;
-let currentLine = null;
 
 let img = null;
 
@@ -78,7 +78,7 @@ function resizeCanvases() {
   if (!wrapper.value) return;
   const w = wrapper.value.clientWidth;
   const h = wrapper.value.clientHeight;
-  [bgCanvas.value, drawCanvas.value, laso.value].forEach(canvas => {
+  [bgCanvas.value, drawCanvas.value, lasso.value].forEach((canvas) => {
     if (!canvas) return;
     canvas.width = w;
     canvas.height = h;
@@ -95,8 +95,9 @@ function drawBackground() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, bgCanvas.value.width, bgCanvas.value.height);
   ctx.setTransform(zoom, 0, 0, zoom, offsetX, offsetY);
-  if (img) ctx.drawImage(img, 0, 0);
-  else {
+  if (img) {
+    ctx.drawImage(img, 0, 0);
+  } else {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, bgCanvas.value.width / zoom, bgCanvas.value.height / zoom);
   }
@@ -133,7 +134,7 @@ function redrawDrawing() {
     }
   }
 
-  if (isDrawing && currentLine && currentLine.points.length && currentTool.value !== "Ластик")  {
+  if (isDrawing.value && currentLine && currentLine.points.length && currentTool.value !== "Ластик" && currentTool.value !== "Лассо") {
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
     ctx.beginPath();
@@ -158,19 +159,23 @@ function redrawDrawing() {
 }
 
 function drawLassoPath() {
-  const ctx = laso.value.getContext("2d");
+  const ctx = lasso.value.getContext("2d");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, laso.value.width, laso.value.height);
-  if (!lassoPoints.value.length) return;
+  ctx.clearRect(0, 0, lasso.value.width, lasso.value.height);
+
+  if (lassoPoints.value.length === 0) return;
+
   ctx.beginPath();
   ctx.strokeStyle = "rgba(0, 0, 255, 0.8)";
   ctx.lineWidth = 2;
+
   const start = lassoPoints.value[0];
   ctx.moveTo(start.x * zoom + offsetX, start.y * zoom + offsetY);
   for (let i = 1; i < lassoPoints.value.length; i++) {
     const p = lassoPoints.value[i];
     ctx.lineTo(p.x * zoom + offsetX, p.y * zoom + offsetY);
   }
+
   ctx.closePath();
   ctx.stroke();
 }
@@ -180,41 +185,44 @@ function getMousePos(e) {
   const rect = drawCanvas.value.getBoundingClientRect();
   return {
     x: (e.clientX - rect.left - offsetX) / zoom,
-    y: (e.clientY - rect.top - offsetY) / zoom
+    y: (e.clientY - rect.top - offsetY) / zoom,
   };
 }
 
 function onPointerDown(e) {
   if (e.button === 2) {
-    isPanning = true;
+    isPanning.value = true;
     panStart.x = e.clientX;
     panStart.y = e.clientY;
-  } else if (e.button === 0) {
-    const pos = getMousePos(e);
-    if (currentTool.value === "Карандаш") {
-      isDrawing = true;
-      currentLine = {
-        points: [pos],
-        color: color.value,
-        size: size.value,
-      };
-      historyRedo.value = [];
-      redrawDrawing();
-    } else if (currentTool.value === "Ластик") {
-      isDrawing = true;
-      redrawDrawing();
-    } else if (currentTool.value === "Лассо") {
-      isDrawing = true;
-      lassoPoints.value = [pos];
-      drawLassoPath();
-    }
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const pos = getMousePos(e);
+
+  if (currentTool.value === "Карандаш") {
+    isDrawing.value = true;
+    currentLine = {
+      points: [pos],
+      color: color.value,
+      size: size.value,
+    };
+    historyRedo.value = [];
+    redrawDrawing();
+  } else if (currentTool.value === "Ластик") {
+    isDrawing.value = true;
+    redrawDrawing();
+  } else if (currentTool.value === "Лассо") {
+    isDrawing.value = true;
+    lassoPoints.value = [pos];
+    drawLassoPath();
   }
 }
 
 function onPointerMove(e) {
   const pos = getMousePos(e);
 
-  if (isPanning) {
+  if (isPanning.value) {
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
     panStart.x = e.clientX;
@@ -224,40 +232,52 @@ function onPointerMove(e) {
     drawBackground();
     redrawDrawing();
     drawLassoPath();
-  } else if (isDrawing) {
-    if (currentTool.value === "Ластик") {
-      lines.value = lines.value.filter((line) => {
-        return !line.points.some((p) => {
-          const dx = p.x - pos.x;
-          const dy = p.y - pos.y;
-          return Math.sqrt(dx * dx + dy * dy) < size.value / zoom;
-        });
+    return;
+  }
+
+  if (!isDrawing.value) return;
+
+  if (currentTool.value === "Ластик") {
+    lines.value = lines.value.filter((line) => {
+      return !line.points.some((p) => {
+        const dx = p.x - pos.x;
+        const dy = p.y - pos.y;
+        return Math.sqrt(dx * dx + dy * dy) < size.value / zoom;
       });
-      redrawDrawing();
-      return;
-    }
-    if (currentTool.value === "Лассо") {
-      lassoPoints.value.push(pos);
-      drawBackground();
-      redrawDrawing();
-      drawLassoPath();
-    }
-    if (currentLine) {
-      currentLine.points.push(pos);
-      redrawDrawing();
-    }
+    });
+    redrawDrawing();
+    return;
+  }
+
+  if (currentTool.value === "Лассо") {
+    lassoPoints.value.push(pos);
+    drawBackground();
+    redrawDrawing();
+    drawLassoPath();
+    return;
+  }
+
+  if (currentLine) {
+    currentLine.points.push(pos);
+    redrawDrawing();
   }
 }
+
 function onPointerUp(e) {
-  if (isDrawing) {
-    if (currentLine && currentLine.points.length > 1 && currentTool.value !== "Ластик" && currentTool.value !== "Лассо") {
+  if (isDrawing.value) {
+    if (
+        currentLine &&
+        currentLine.points.length > 1 &&
+        currentTool.value !== "Ластик" &&
+        currentTool.value !== "Лассо"
+    ) {
       lines.value.push(currentLine);
       historyRedo.value = [];
     }
     currentLine = null;
   }
-  isDrawing = false;
-  isPanning = false;
+  isDrawing.value = false;
+  isPanning.value = false;
   drawLassoPath();
   redrawDrawing();
 }
@@ -266,12 +286,16 @@ function handleWheel(e) {
   const rect = bgCanvas.value.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
+
   const prevX = (mouseX - offsetX) / zoom;
   const prevY = (mouseY - offsetY) / zoom;
+
   zoom *= e.deltaY < 0 ? 1.1 : 0.9;
   zoom = Math.min(Math.max(zoom, minZoom), maxZoom);
+
   offsetX = mouseX - prevX * zoom;
   offsetY = mouseY - prevY * zoom;
+
   drawBackground();
   redrawDrawing();
   drawLassoPath();
@@ -297,10 +321,16 @@ function clearDrawing() {
   historyRedo.value = [];
   redrawDrawing();
 }
+
 function selectTool(tool) {
   currentTool.value = tool;
+  if (tool !== "Лассо") {
+    lassoPoints.value = [];
+    drawLassoPath();
+  }
   showTools.value = false;
 }
+
 function downloadImage() {
   const bg = bgCanvas.value;
   const draw = drawCanvas.value;
@@ -317,38 +347,36 @@ function downloadImage() {
   link.href = tempCanvas.toDataURL("image/png");
   link.click();
 }
+
 function cutLassoArea() {
   if (!img || lassoPoints.value.length < 3) return;
-  const w = bgCanvas.value.width;
-  const h = bgCanvas.value.height;
   const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = w;
-  tempCanvas.height = h;
+  tempCanvas.width = img.width;
+  tempCanvas.height = img.height;
   const tempCtx = tempCanvas.getContext("2d");
-  tempCtx.setTransform(zoom, 0, 0, zoom, offsetX, offsetY);
-  tempCtx.drawImage(img, 0, 0);
+  tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
   tempCtx.save();
   tempCtx.beginPath();
-  const first = lassoPoints.value[0];
-  tempCtx.moveTo(first.x, first.y);
-  for (let i = 1; i < lassoPoints.value.length; i++) {
-    const p = lassoPoints.value[i];
-    tempCtx.lineTo(p.x, p.y);
+  const pointsOnImage = lassoPoints.value;
+  tempCtx.moveTo(pointsOnImage[0].x, pointsOnImage[0].y);
+  for (let i = 1; i < pointsOnImage.length; i++) {
+    tempCtx.lineTo(pointsOnImage[i].x, pointsOnImage[i].y);
   }
   tempCtx.closePath();
   tempCtx.clip();
-  tempCtx.clearRect(0, 0, w, h);
+  tempCtx.drawImage(img, 0, 0);
   tempCtx.restore();
   const newImage = new Image();
   newImage.onload = () => {
     img = newImage;
+    lassoPoints.value = [];
     drawBackground();
     redrawDrawing();
-    lassoPoints.value = [];
     drawLassoPath();
   };
   newImage.src = tempCanvas.toDataURL();
 }
+
 function undoAction() {
   if (lines.value.length === 0) return;
   const removed = lines.value.pop();
@@ -357,9 +385,11 @@ function undoAction() {
   }
   redrawDrawing();
 }
+
 function onResize() {
   resizeCanvases();
 }
+
 onMounted(() => {
   resizeCanvases();
   window.addEventListener("resize", onResize);
@@ -369,200 +399,3 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onResize);
 });
 </script>
-<style scoped>
-.draw-app {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  user-select: none;
-  background: #fdfdfd;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  overflow: hidden;
-}
-
-.canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  touch-action: none;
-}
-
-.bg-canvas {
-  z-index: 0;
-  background: #fff;
-}
-
-.draw-canvas {
-  z-index: 1;
-  cursor: crosshair;
-}
-
-.tools-toggle {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: linear-gradient(135deg, #4a90e2, #357abd);
-  color: white;
-  font-weight: bold;
-  font-size: 16px;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-  z-index: 11;
-  box-shadow: 0 4px 12px rgba(53, 122, 189, 0.5);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-.tools-toggle:hover {
-  background: linear-gradient(135deg, #357abd, #285a8f);
-}
-
-.toolbar {
-  position: absolute;
-  top: 80px;
-  left: 20px;
-  width: 260px;
-  padding: 20px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-  display: none;
-  flex-direction: column;
-  gap: 14px;
-  z-index: 10;
-}
-.toolbar.visible {
-  display: flex;
-}
-
-.tools-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-}
-
-.tools-list button {
-  flex: 1 0 45%;
-  padding: 8px;
-  background: #f0f0f0;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  text-align: center;
-}
-.tools-list button.active,
-.tools-list button:hover {
-  background: #4a90e2;
-  color: white;
-}
-
-input[type="color"],
-input[type="range"] {
-  width: 100%;
-  height: 36px;
-  border: none;
-  border-radius: 8px;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-}
-input[type="range"] {
-  padding: 0;
-  margin-top: 6px;
-  appearance: none;
-  background: #eee;
-  height: 8px;
-  border-radius: 6px;
-}
-input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: red;
-  cursor: pointer;
-  border: none;
-  margin-top: -5px;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
-}
-
-.upload-btn {
-  position: relative;
-  display: inline-block;
-  background: #4a90e2;
-  color: white;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 10px;
-  text-align: center;
-  border-radius: 8px;
-  cursor: pointer;
-  overflow: hidden;
-  transition: background 0.3s ease;
-}
-.upload-btn:hover {
-  background: #357abd;
-}
-.upload-btn input[type="file"] {
-  position: absolute;
-  left: 0;
-  top: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-}
-
-.clear-btn {
-  background: #f2f6ff;
-  border: none;
-  padding: 10px;
-  font-weight: bold;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.3s ease;
-}
-.clear-btn:hover {
-  background: #e0ebff;
-}
-
-.undo-btn {
-  background: #fff5f5;
-  border: none;
-  padding: 10px;
-  font-weight: bold;
-  font-size: 14px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.3s ease;
-  color: #d9534f;
-  box-shadow: 0 2px 6px rgba(217, 83, 79, 0.2);
-}
-.undo-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.undo-btn:hover:not(:disabled) {
-  background: #ffeaea;
-}
-.lasso-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 999; /* выше, чем у остальных холстов */
-  pointer-events: none; /* чтобы не перехватывал мышку */
-}
-
-canvas {
-  border: 1px solid black;
-}
-button {
-  margin-top: 10px;
-}
-
-</style>
