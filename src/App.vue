@@ -17,7 +17,9 @@
         v-show="showCutButton && lassoPoints.length > 2"
         class="cut-button"
         :style="{ top: cutButtonPos.y + 'px', left: cutButtonPos.x + 'px' }"
-        @click="cutLassoArea"
+        @mousedown.stop
+        @mouseup.stop
+        @click.stop="cutLassoArea"
     >
       Вырезать лассо
     </button>
@@ -161,26 +163,21 @@ function redrawDrawing() {
       currentTool.value !== "Ластик" &&
       currentTool.value !== "Лассо"
   ) {
+    const p0 = currentLine.points[0];
+    const px0 = p0.x * zoom + offsetX;
+    const py0 = p0.y * zoom + offsetY;
+
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
     ctx.beginPath();
-    if (currentLine.points.length === 1) {
-      const p = currentLine.points[0];
+    ctx.moveTo(px0, py0);
+    for (let i = 1; i < currentLine.points.length; i++) {
+      const p = currentLine.points[i];
       const px = p.x * zoom + offsetX;
       const py = p.y * zoom + offsetY;
-      ctx.fillStyle = currentLine.color;
-      ctx.arc(px, py, currentLine.size / 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      for (let i = 0; i < currentLine.points.length; i++) {
-        const p = currentLine.points[i];
-        const px = p.x * zoom + offsetX;
-        const py = p.y * zoom + offsetY;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
+      ctx.lineTo(px, py);
     }
+    ctx.stroke();
   }
 }
 
@@ -215,6 +212,8 @@ function getMousePos(e) {
 }
 
 function onPointerDown(e) {
+  if (e.target && e.target.closest && e.target.closest(".cut-button")) return;
+
   if (e.button === 2) {
     isPanning.value = true;
     panStart.x = e.clientX;
@@ -283,7 +282,7 @@ function onPointerMove(e) {
   }
 }
 
-function onPointerUp(e) {
+function onPointerUp() {
   if (isDrawing.value) {
     if (
         currentLine &&
@@ -299,6 +298,7 @@ function onPointerUp(e) {
   isPanning.value = false;
   redrawDrawing();
 }
+
 function handleWheel(e) {
   const rect = bgCanvas.value.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
@@ -313,10 +313,12 @@ function handleWheel(e) {
   redrawDrawing();
   drawLassoPath();
 }
+
 function loadImage(e) {
   const file = e.target.files[0];
   if (!file) return;
   const image = new Image();
+  image.crossOrigin = "anonymous";
   image.onload = () => {
     img = image;
     zoom = 1;
@@ -327,14 +329,17 @@ function loadImage(e) {
   };
   image.src = URL.createObjectURL(file);
 }
+
 function clearDrawing() {
   lines.value = [];
   historyRedo.value = [];
   redrawDrawing();
 }
+
 function selectTool(tool) {
   currentTool.value = tool;
 }
+
 function downloadImage() {
   const bg = bgCanvas.value;
   const draw = drawCanvas.value;
@@ -350,6 +355,7 @@ function downloadImage() {
   link.href = tempCanvas.toDataURL("image/png");
   link.click();
 }
+
 function pointInPolygon(point, polygon) {
   const x = point.x, y = point.y;
   let inside = false;
@@ -364,17 +370,31 @@ function pointInPolygon(point, polygon) {
 }
 
 function cutLassoArea() {
-  if (lassoPoints.value.length < 3) return;
+  console.log("cutLassoArea work");
+  if (lassoPoints.value.length < 3){
+    console.warn("Мало точек")
+    return;
+  }
   const polygon = lassoPoints.value.map(p => ({ x: p.x, y: p.y }));
+
   lines.value = lines.value.filter(line => {
     return !line.points.some(point => pointInPolygon(point, polygon));
   });
-  if (!img) return;
+
+  if (!img) {
+    lassoPoints.value = [];
+    drawLassoPath();
+    redrawDrawing();
+    return;
+  }
+
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = img.width;
   tempCanvas.height = img.height;
   const tempCtx = tempCanvas.getContext('2d');
+
   tempCtx.drawImage(img, 0, 0);
+
   tempCtx.globalCompositeOperation = 'destination-out';
   tempCtx.beginPath();
   tempCtx.moveTo(polygon[0].x, polygon[0].y);
@@ -383,6 +403,7 @@ function cutLassoArea() {
   }
   tempCtx.closePath();
   tempCtx.fill();
+
   const newImg = new Image();
   newImg.onload = () => {
     img = newImg;
@@ -390,6 +411,7 @@ function cutLassoArea() {
     redrawDrawing();
   };
   newImg.src = tempCanvas.toDataURL();
+
   lassoPoints.value = [];
   drawLassoPath();
 }
