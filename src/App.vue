@@ -557,7 +557,7 @@ input[type="range"] {
 
 .upload-btn {
   display: inline-block;
-  width: 100%;
+  width: 90%;
   padding: 10px 15px;
   background: #4a90e2;
   color: white;
