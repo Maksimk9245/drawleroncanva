@@ -13,7 +13,14 @@
     <canvas ref="drawCanvas" class="canvas draw-canvas"></canvas>
     <canvas ref="lasso" class="lasso-canvas"></canvas>
 
-    <button @click="cutLassoArea" :disabled="lassoPoints.length < 3">Вырезать лассо</button>
+    <button
+        v-show="showCutButton && lassoPoints.length > 2"
+        class="cut-button"
+        :style="{ top: cutButtonPos.y + 'px', left: cutButtonPos.x + 'px' }"
+        @click="cutLassoArea"
+    >
+      Вырезать лассо
+    </button>
     <button class="tools-toggle" @click="showTools = !showTools">🛠️ Инструменты</button>
 
     <div class="toolbar" :class="{ visible: showTools }">
@@ -41,7 +48,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 
 const wrapper = ref(null);
 const bgCanvas = ref(null);
@@ -60,6 +67,19 @@ const historyRedo = ref([]);
 const lassoPoints = ref([]);
 const isDrawing = ref(false);
 const isPanning = ref(false);
+const cutButtonPos = ref({ x: 0, y: 0 });
+
+const showCutButton = computed(() => currentTool.value === "Лассо");
+
+watch(lassoPoints, (points) => {
+  if (points.length > 0) {
+    const lastPoint = points[points.length - 1];
+    cutButtonPos.value = {
+      x: lastPoint.x * zoom + offsetX,
+      y: lastPoint.y * zoom + offsetY,
+    };
+  }
+});
 
 let currentLine = null;
 
@@ -134,7 +154,13 @@ function redrawDrawing() {
     }
   }
 
-  if (isDrawing.value && currentLine && currentLine.points.length && currentTool.value !== "Ластик" && currentTool.value !== "Лассо") {
+  if (
+      isDrawing.value &&
+      currentLine &&
+      currentLine.points.length &&
+      currentTool.value !== "Ластик" &&
+      currentTool.value !== "Лассо"
+  ) {
     ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = currentLine.size;
     ctx.beginPath();
@@ -175,7 +201,6 @@ function drawLassoPath() {
     const p = lassoPoints.value[i];
     ctx.lineTo(p.x * zoom + offsetX, p.y * zoom + offsetY);
   }
-
   ctx.closePath();
   ctx.stroke();
 }
@@ -221,7 +246,6 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   const pos = getMousePos(e);
-
   if (isPanning.value) {
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
@@ -234,9 +258,7 @@ function onPointerMove(e) {
     drawLassoPath();
     return;
   }
-
   if (!isDrawing.value) return;
-
   if (currentTool.value === "Ластик") {
     lines.value = lines.value.filter((line) => {
       return !line.points.some((p) => {
@@ -251,8 +273,6 @@ function onPointerMove(e) {
 
   if (currentTool.value === "Лассо") {
     lassoPoints.value.push(pos);
-    drawBackground();
-    redrawDrawing();
     drawLassoPath();
     return;
   }
@@ -274,33 +294,25 @@ function onPointerUp(e) {
       lines.value.push(currentLine);
       historyRedo.value = [];
     }
-    currentLine = null;
   }
   isDrawing.value = false;
   isPanning.value = false;
-  drawLassoPath();
   redrawDrawing();
 }
-
 function handleWheel(e) {
   const rect = bgCanvas.value.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
-
   const prevX = (mouseX - offsetX) / zoom;
   const prevY = (mouseY - offsetY) / zoom;
-
   zoom *= e.deltaY < 0 ? 1.1 : 0.9;
   zoom = Math.min(Math.max(zoom, minZoom), maxZoom);
-
   offsetX = mouseX - prevX * zoom;
   offsetY = mouseY - prevY * zoom;
-
   drawBackground();
   redrawDrawing();
   drawLassoPath();
 }
-
 function loadImage(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -315,22 +327,14 @@ function loadImage(e) {
   };
   image.src = URL.createObjectURL(file);
 }
-
 function clearDrawing() {
   lines.value = [];
   historyRedo.value = [];
   redrawDrawing();
 }
-
 function selectTool(tool) {
   currentTool.value = tool;
-  if (tool !== "Лассо") {
-    lassoPoints.value = [];
-    drawLassoPath();
-  }
-  showTools.value = false;
 }
-
 function downloadImage() {
   const bg = bgCanvas.value;
   const draw = drawCanvas.value;
@@ -341,40 +345,53 @@ function downloadImage() {
   const ctx = tempCanvas.getContext("2d");
   ctx.drawImage(bg, 0, 0);
   ctx.drawImage(draw, 0, 0);
-
   const link = document.createElement("a");
   link.download = "drawing.png";
   link.href = tempCanvas.toDataURL("image/png");
   link.click();
 }
+function pointInPolygon(point, polygon) {
+  const x = point.x, y = point.y;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > y) !== (yj > y)) &&
+        (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
 
 function cutLassoArea() {
-  if (!img || lassoPoints.value.length < 3) return;
-  const tempCanvas = document.createElement("canvas");
+  if (lassoPoints.value.length < 3) return;
+  const polygon = lassoPoints.value.map(p => ({ x: p.x, y: p.y }));
+  lines.value = lines.value.filter(line => {
+    return !line.points.some(point => pointInPolygon(point, polygon));
+  });
+  if (!img) return;
+  const tempCanvas = document.createElement('canvas');
   tempCanvas.width = img.width;
   tempCanvas.height = img.height;
-  const tempCtx = tempCanvas.getContext("2d");
-  tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-  tempCtx.save();
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(img, 0, 0);
+  tempCtx.globalCompositeOperation = 'destination-out';
   tempCtx.beginPath();
-  const pointsOnImage = lassoPoints.value;
-  tempCtx.moveTo(pointsOnImage[0].x, pointsOnImage[0].y);
-  for (let i = 1; i < pointsOnImage.length; i++) {
-    tempCtx.lineTo(pointsOnImage[i].x, pointsOnImage[i].y);
+  tempCtx.moveTo(polygon[0].x, polygon[0].y);
+  for (let i = 1; i < polygon.length; i++) {
+    tempCtx.lineTo(polygon[i].x, polygon[i].y);
   }
   tempCtx.closePath();
-  tempCtx.clip();
-  tempCtx.drawImage(img, 0, 0);
-  tempCtx.restore();
-  const newImage = new Image();
-  newImage.onload = () => {
-    img = newImage;
-    lassoPoints.value = [];
+  tempCtx.fill();
+  const newImg = new Image();
+  newImg.onload = () => {
+    img = newImg;
     drawBackground();
     redrawDrawing();
-    drawLassoPath();
   };
-  newImage.src = tempCanvas.toDataURL();
+  newImg.src = tempCanvas.toDataURL();
+  lassoPoints.value = [];
+  drawLassoPath();
 }
 
 function undoAction() {
@@ -399,6 +416,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", onResize);
 });
 </script>
+
 <style scoped>
 .draw-app {
   position: relative;
@@ -434,8 +452,8 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 10; /* выше остальных */
-  pointer-events: none; /* не блокируем мышь */
+  z-index: 10;
+  pointer-events: none;
 }
 
 .tools-toggle {
@@ -512,81 +530,72 @@ input[type="range"] {
 }
 input[type="range"] {
   padding: 0;
-  margin-top: 6px;
-  appearance: none;
-  background: #eee;
-  height: 8px;
-  border-radius: 6px;
-}
-input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: red;
-  cursor: pointer;
-  border: none;
-  margin-top: -5px;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+  margin: 0;
 }
 
 .upload-btn {
-  position: relative;
   display: inline-block;
+  width: 100%;
+  padding: 10px 15px;
   background: #4a90e2;
   color: white;
   font-weight: 600;
-  font-size: 13px;
-  padding: 10px;
-  text-align: center;
-  border-radius: 8px;
+  border-radius: 14px;
   cursor: pointer;
-  overflow: hidden;
+  text-align: center;
+  user-select: none;
   transition: background 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.upload-btn input[type="file"] {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 .upload-btn:hover {
   background: #357abd;
 }
-.upload-btn input[type="file"] {
-  position: absolute;
-  left: 0;
-  top: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-}
 
-.clear-btn {
-  background: #f2f6ff;
-  border: none;
-  padding: 10px;
-  font-weight: bold;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.3s ease;
-}
-.clear-btn:hover {
-  background: #e0ebff;
-}
-
+.clear-btn,
 .undo-btn {
-  background: #fff5f5;
+  background: #ff4a4a;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 10px 16px;
   border: none;
-  padding: 10px;
-  font-weight: bold;
-  font-size: 14px;
-  border-radius: 10px;
   cursor: pointer;
   transition: background 0.3s ease;
-  color: #d9534f;
-  box-shadow: 0 2px 6px rgba(217, 83, 79, 0.2);
+}
+.clear-btn:hover,
+.undo-btn:hover:not(:disabled) {
+  background: #cc0000;
 }
 .undo-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+  background: #ffa3a3;
+  cursor: not-allowed;
 }
-.undo-btn:hover:not(:disabled) {
-  background: #ffeaea;
+
+.cut-button {
+  position: absolute;
+  z-index: 15;
+  padding: 10px 20px;
+  font-weight: 700;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(53, 122, 189, 0.7);
+  transition: background 0.3s ease;
+}
+.cut-button:hover {
+  background: linear-gradient(135deg, #357abd, #285a8f);
 }
 </style>
