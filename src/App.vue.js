@@ -1,44 +1,54 @@
-/// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
-const wrapper = ref(null);
-const bgCanvas = ref(null);
-const drawCanvas = ref(null);
-const lasso = ref(null);
-const showTools = ref(false);
-const tools = ["Карандаш", "Ластик", "Лассо"];
-const currentTool = ref("Карандаш");
-const color = ref("#000000");
-const size = ref(5);
-const lines = ref([]);
-const historyRedo = ref([]);
-const lassoPoints = ref([]);
-const isDrawing = ref(false);
-const isPanning = ref(false);
-const cutButtonPos = ref({ x: 0, y: 0 });
-const showCutButton = computed(() => currentTool.value === "Лассо");
-watch(lassoPoints, (points) => {
+var wrapper = ref(null);
+var bgCanvas = ref(null);
+var drawCanvas = ref(null);
+var lasso = ref(null);
+var showTools = ref(false);
+var tools = ["Карандаш", "Ластик", "Лассо"];
+var currentTool = ref("Карандаш");
+var color = ref("#000000");
+var size = ref(5);
+var lines = ref([]);
+var historyRedo = ref([]);
+var lassoPoints = ref([]);
+var isDrawing = ref(false);
+var isPanning = ref(false);
+var cutButtonPos = ref({ x: 0, y: 0 });
+var showCutButton = computed(function () { return currentTool.value === "Лассо"; });
+watch(lassoPoints, function (points) {
     if (points.length > 0) {
-        const lastPoint = points[points.length - 1];
+        var lastPoint = points[points.length - 1];
         cutButtonPos.value = {
             x: lastPoint.x * zoom + offsetX,
             y: lastPoint.y * zoom + offsetY,
         };
     }
 });
-let currentLine = null;
-let zoom = 1;
-const minZoom = 0.1;
-const maxZoom = 10;
-let offsetX = 0;
-let offsetY = 0;
-let panStart = { x: 0, y: 0 };
-let img = null;
+var currentLine = null;
+var zoom = 1;
+var minZoom = 0.1;
+var maxZoom = 10;
+var offsetX = 0;
+var offsetY = 0;
+var panStart = { x: 0, y: 0 };
+var img = null;
 function resizeCanvases() {
     if (!wrapper.value)
         return;
-    const w = wrapper.value.clientWidth;
-    const h = wrapper.value.clientHeight;
-    [bgCanvas.value, drawCanvas.value, lasso.value].forEach((canvas) => {
+    var w = wrapper.value.clientWidth;
+    var h = wrapper.value.clientHeight;
+    [bgCanvas.value, drawCanvas.value, lasso.value].forEach(function (canvas) {
         if (!canvas)
             return;
         canvas.width = w;
@@ -51,7 +61,7 @@ function resizeCanvases() {
     drawLassoPath();
 }
 function drawBackground() {
-    const ctx = bgCanvas.value.getContext("2d");
+    var ctx = bgCanvas.value.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, bgCanvas.value.width, bgCanvas.value.height);
     ctx.setTransform(zoom, 0, 0, zoom, offsetX, offsetY);
@@ -64,30 +74,31 @@ function drawBackground() {
     }
 }
 function redrawDrawing() {
-    const ctx = drawCanvas.value.getContext("2d");
+    var ctx = drawCanvas.value.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    for (const line of lines.value) {
+    for (var _i = 0, _a = lines.value; _i < _a.length; _i++) {
+        var line = _a[_i];
         if (!line.points.length)
             continue;
         ctx.strokeStyle = line.color;
         ctx.lineWidth = line.size;
         ctx.beginPath();
         if (line.points.length === 1) {
-            const p = line.points[0];
-            const px = p.x * zoom + offsetX;
-            const py = p.y * zoom + offsetY;
+            var p = line.points[0];
+            var px = p.x * zoom + offsetX;
+            var py = p.y * zoom + offsetY;
             ctx.fillStyle = line.color;
             ctx.arc(px, py, line.size / 2, 0, Math.PI * 2);
             ctx.fill();
         }
         else {
-            for (let i = 0; i < line.points.length; i++) {
-                const p = line.points[i];
-                const px = p.x * zoom + offsetX;
-                const py = p.y * zoom + offsetY;
+            for (var i = 0; i < line.points.length; i++) {
+                var p = line.points[i];
+                var px = p.x * zoom + offsetX;
+                var py = p.y * zoom + offsetY;
                 if (i === 0)
                     ctx.moveTo(px, py);
                 else
@@ -101,24 +112,24 @@ function redrawDrawing() {
         currentLine.points.length &&
         currentTool.value !== "Ластик" &&
         currentTool.value !== "Лассо") {
-        const p0 = currentLine.points[0];
-        const px0 = p0.x * zoom + offsetX;
-        const py0 = p0.y * zoom + offsetY;
+        var p0 = currentLine.points[0];
+        var px0 = p0.x * zoom + offsetX;
+        var py0 = p0.y * zoom + offsetY;
         ctx.strokeStyle = currentLine.color;
         ctx.lineWidth = currentLine.size;
         ctx.beginPath();
         ctx.moveTo(px0, py0);
-        for (let i = 1; i < currentLine.points.length; i++) {
-            const p = currentLine.points[i];
-            const px = p.x * zoom + offsetX;
-            const py = p.y * zoom + offsetY;
+        for (var i = 1; i < currentLine.points.length; i++) {
+            var p = currentLine.points[i];
+            var px = p.x * zoom + offsetX;
+            var py = p.y * zoom + offsetY;
             ctx.lineTo(px, py);
         }
         ctx.stroke();
     }
 }
 function drawLassoPath() {
-    const ctx = lasso.value.getContext("2d");
+    var ctx = lasso.value.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, lasso.value.width, lasso.value.height);
     if (lassoPoints.value.length === 0)
@@ -126,10 +137,10 @@ function drawLassoPath() {
     ctx.beginPath();
     ctx.strokeStyle = "rgba(0, 0, 255, 0.8)";
     ctx.lineWidth = 2;
-    const start = lassoPoints.value[0];
+    var start = lassoPoints.value[0];
     ctx.moveTo(start.x * zoom + offsetX, start.y * zoom + offsetY);
-    for (let i = 1; i < lassoPoints.value.length; i++) {
-        const p = lassoPoints.value[i];
+    for (var i = 1; i < lassoPoints.value.length; i++) {
+        var p = lassoPoints.value[i];
         ctx.lineTo(p.x * zoom + offsetX, p.y * zoom + offsetY);
     }
     ctx.closePath();
@@ -138,7 +149,7 @@ function drawLassoPath() {
 function getMousePos(e) {
     if (!drawCanvas.value)
         return { x: 0, y: 0 };
-    const rect = drawCanvas.value.getBoundingClientRect();
+    var rect = drawCanvas.value.getBoundingClientRect();
     return {
         x: (e.clientX - rect.left - offsetX) / zoom,
         y: (e.clientY - rect.top - offsetY) / zoom,
@@ -155,7 +166,7 @@ function onPointerDown(e) {
     }
     if (e.button !== 0)
         return;
-    const pos = getMousePos(e);
+    var pos = getMousePos(e);
     if (currentTool.value === "Карандаш") {
         isDrawing.value = true;
         currentLine = {
@@ -177,10 +188,10 @@ function onPointerDown(e) {
     }
 }
 function onPointerMove(e) {
-    const pos = getMousePos(e);
+    var pos = getMousePos(e);
     if (isPanning.value) {
-        const dx = e.clientX - panStart.x;
-        const dy = e.clientY - panStart.y;
+        var dx = e.clientX - panStart.x;
+        var dy = e.clientY - panStart.y;
         panStart.x = e.clientX;
         panStart.y = e.clientY;
         offsetX += dx;
@@ -193,10 +204,10 @@ function onPointerMove(e) {
     if (!isDrawing.value)
         return;
     if (currentTool.value === "Ластик") {
-        lines.value = lines.value.filter((line) => {
-            return !line.points.some((p) => {
-                const dx = p.x - pos.x;
-                const dy = p.y - pos.y;
+        lines.value = lines.value.filter(function (line) {
+            return !line.points.some(function (p) {
+                var dx = p.x - pos.x;
+                var dy = p.y - pos.y;
                 return Math.sqrt(dx * dx + dy * dy) < size.value / zoom;
             });
         });
@@ -228,11 +239,11 @@ function onPointerUp() {
     redrawDrawing();
 }
 function handleWheel(e) {
-    const rect = bgCanvas.value.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const prevX = (mouseX - offsetX) / zoom;
-    const prevY = (mouseY - offsetY) / zoom;
+    var rect = bgCanvas.value.getBoundingClientRect();
+    var mouseX = e.clientX - rect.left;
+    var mouseY = e.clientY - rect.top;
+    var prevX = (mouseX - offsetX) / zoom;
+    var prevY = (mouseY - offsetY) / zoom;
     zoom *= e.deltaY < 0 ? 1.1 : 0.9;
     zoom = Math.min(Math.max(zoom, minZoom), maxZoom);
     offsetX = mouseX - prevX * zoom;
@@ -242,12 +253,12 @@ function handleWheel(e) {
     drawLassoPath();
 }
 function loadImage(e) {
-    const file = e.target.files[0];
+    var file = e.target.files[0];
     if (!file)
         return;
-    const image = new Image();
+    var image = new Image();
     image.crossOrigin = "anonymous";
-    image.onload = () => {
+    image.onload = function () {
         img = image;
         zoom = 1;
         offsetX = 0;
@@ -266,28 +277,28 @@ function selectTool(tool) {
     currentTool.value = tool;
 }
 function downloadImage() {
-    const bg = bgCanvas.value;
-    const draw = drawCanvas.value;
+    var bg = bgCanvas.value;
+    var draw = drawCanvas.value;
     if (!bg || !draw)
         return;
-    const tempCanvas = document.createElement("canvas");
+    var tempCanvas = document.createElement("canvas");
     tempCanvas.width = bg.width;
     tempCanvas.height = bg.height;
-    const ctx = tempCanvas.getContext("2d");
+    var ctx = tempCanvas.getContext("2d");
     ctx.drawImage(bg, 0, 0);
     ctx.drawImage(draw, 0, 0);
-    const link = document.createElement("a");
+    var link = document.createElement("a");
     link.download = "drawing.png";
     link.href = tempCanvas.toDataURL("image/png");
     link.click();
 }
 function pointInPolygon(point, polygon) {
-    const x = point.x, y = point.y;
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].x, yi = polygon[i].y;
-        const xj = polygon[j].x, yj = polygon[j].y;
-        const intersect = ((yi > y) !== (yj > y)) &&
+    var x = point.x, y = point.y;
+    var inside = false;
+    for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        var xi = polygon[i].x, yi = polygon[i].y;
+        var xj = polygon[j].x, yj = polygon[j].y;
+        var intersect = ((yi > y) !== (yj > y)) &&
             (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
         if (intersect)
             inside = !inside;
@@ -300,9 +311,9 @@ function cutLassoArea() {
         console.warn("Мало точек");
         return;
     }
-    const polygon = lassoPoints.value.map(p => ({ x: p.x, y: p.y }));
-    lines.value = lines.value.filter(line => {
-        return !line.points.some(point => pointInPolygon(point, polygon));
+    var polygon = lassoPoints.value.map(function (p) { return ({ x: p.x, y: p.y }); });
+    lines.value = lines.value.filter(function (line) {
+        return !line.points.some(function (point) { return pointInPolygon(point, polygon); });
     });
     if (!img) {
         lassoPoints.value = [];
@@ -310,21 +321,21 @@ function cutLassoArea() {
         redrawDrawing();
         return;
     }
-    const tempCanvas = document.createElement('canvas');
+    var tempCanvas = document.createElement('canvas');
     tempCanvas.width = img.width;
     tempCanvas.height = img.height;
-    const tempCtx = tempCanvas.getContext('2d');
+    var tempCtx = tempCanvas.getContext('2d');
     tempCtx.drawImage(img, 0, 0);
     tempCtx.globalCompositeOperation = 'destination-out';
     tempCtx.beginPath();
     tempCtx.moveTo(polygon[0].x, polygon[0].y);
-    for (let i = 1; i < polygon.length; i++) {
+    for (var i = 1; i < polygon.length; i++) {
         tempCtx.lineTo(polygon[i].x, polygon[i].y);
     }
     tempCtx.closePath();
     tempCtx.fill();
-    const newImg = new Image();
-    newImg.onload = () => {
+    var newImg = new Image();
+    newImg.onload = function () {
         img = newImg;
         drawBackground();
         redrawDrawing();
@@ -336,7 +347,7 @@ function cutLassoArea() {
 function undoAction() {
     if (lines.value.length === 0)
         return;
-    const removed = lines.value.pop();
+    var removed = lines.value.pop();
     if (removed) {
         historyRedo.value.push(removed);
     }
@@ -345,17 +356,17 @@ function undoAction() {
 function onResize() {
     resizeCanvases();
 }
-onMounted(() => {
+onMounted(function () {
     resizeCanvases();
     window.addEventListener("resize", onResize);
 });
-onBeforeUnmount(() => {
+onBeforeUnmount(function () {
     window.removeEventListener("resize", onResize);
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
-const __VLS_ctx = {};
-let __VLS_components;
-let __VLS_directives;
+var __VLS_ctx = {};
+var __VLS_components;
+var __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['tools-toggle']} */ ;
 /** @type {__VLS_StyleScopedClasses['toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['tools-list']} */ ;
@@ -369,71 +380,43 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['cut-button']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ onWheel: (__VLS_ctx.handleWheel) },
-    ...{ onMousedown: (__VLS_ctx.onPointerDown) },
-    ...{ onMousemove: (__VLS_ctx.onPointerMove) },
-    ...{ onMouseup: (__VLS_ctx.onPointerUp) },
-    ...{ onMouseleave: (__VLS_ctx.onPointerUp) },
-    ...{ onContextmenu: () => { } },
-    ...{ class: "draw-app" },
-    ref: "wrapper",
-});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)(__assign(__assign(__assign(__assign(__assign(__assign(__assign({ onWheel: (__VLS_ctx.handleWheel) }, { onMousedown: (__VLS_ctx.onPointerDown) }), { onMousemove: (__VLS_ctx.onPointerMove) }), { onMouseup: (__VLS_ctx.onPointerUp) }), { onMouseleave: (__VLS_ctx.onPointerUp) }), { onContextmenu: function () { } }), { class: "draw-app" }), { ref: "wrapper" }));
 /** @type {typeof __VLS_ctx.wrapper} */ ;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.canvas, __VLS_intrinsicElements.canvas)({
-    ref: "bgCanvas",
-    ...{ class: "canvas bg-canvas" },
-});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.canvas, __VLS_intrinsicElements.canvas)(__assign({ ref: "bgCanvas" }, { class: "canvas bg-canvas" }));
 /** @type {typeof __VLS_ctx.bgCanvas} */ ;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.canvas, __VLS_intrinsicElements.canvas)({
-    ref: "drawCanvas",
-    ...{ class: "canvas draw-canvas" },
-});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.canvas, __VLS_intrinsicElements.canvas)(__assign({ ref: "drawCanvas" }, { class: "canvas draw-canvas" }));
 /** @type {typeof __VLS_ctx.drawCanvas} */ ;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.canvas, __VLS_intrinsicElements.canvas)({
-    ref: "lasso",
-    ...{ class: "lasso-canvas" },
-});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.canvas, __VLS_intrinsicElements.canvas)(__assign({ ref: "lasso" }, { class: "lasso-canvas" }));
 /** @type {typeof __VLS_ctx.lasso} */ ;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onMousedown: () => { } },
-    ...{ onMouseup: () => { } },
-    ...{ onClick: (__VLS_ctx.cutLassoArea) },
-    ...{ class: "cut-button" },
-    ...{ style: ({ top: __VLS_ctx.cutButtonPos.y + 'px', left: __VLS_ctx.cutButtonPos.x + 'px' }) },
-});
-__VLS_asFunctionalDirective(__VLS_directives.vShow)(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.showCutButton && __VLS_ctx.lassoPoints.length > 2) }, null, null);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.showTools = !__VLS_ctx.showTools;
-        } },
-    ...{ class: "tools-toggle" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "toolbar" },
-    ...{ class: ({ visible: __VLS_ctx.showTools }) },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "tools-list" },
-});
-for (const [tool] of __VLS_getVForSourceType((__VLS_ctx.tools))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.selectTool(tool);
-            } },
-        key: (tool),
-        ...{ class: ({ active: __VLS_ctx.currentTool === tool }) },
-    });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)(__assign(__assign(__assign(__assign({ onMousedown: function () { } }, { onMouseup: function () { } }), { onClick: (__VLS_ctx.cutLassoArea) }), { class: "cut-button" }), { style: ({ top: __VLS_ctx.cutButtonPos.y + 'px', left: __VLS_ctx.cutButtonPos.x + 'px' }) }));
+__VLS_asFunctionalDirective(__VLS_directives.vShow)(null, __assign(__assign({}, __VLS_directiveBindingRestFields), { value: (__VLS_ctx.showCutButton && __VLS_ctx.lassoPoints.length > 2) }), null, null);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)(__assign({ onClick: function () {
+        var _a = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            _a[_i] = arguments[_i];
+        }
+        var $event = _a[0];
+        __VLS_ctx.showTools = !__VLS_ctx.showTools;
+    } }, { class: "tools-toggle" }));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)(__assign({ class: "toolbar" }, { class: ({ visible: __VLS_ctx.showTools }) }));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)(__assign({ class: "tools-list" }));
+var _loop_1 = function (tool) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)(__assign(__assign({ onClick: function () {
+            var _a = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                _a[_i] = arguments[_i];
+            }
+            var $event = _a[0];
+            __VLS_ctx.selectTool(tool);
+        } }, { key: (tool) }), { class: ({ active: __VLS_ctx.currentTool === tool }) }));
     (tool);
+};
+for (var _i = 0, _a = __VLS_getVForSourceType((__VLS_ctx.tools)); _i < _a.length; _i++) {
+    var tool = _a[_i][0];
+    _loop_1(tool);
 }
-__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
-    ...{ class: "upload-btn" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ onChange: (__VLS_ctx.loadImage) },
-    type: "file",
-    accept: "image/*",
-});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)(__assign({ class: "upload-btn" }));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)(__assign({ onChange: (__VLS_ctx.loadImage) }, { type: "file", accept: "image/*" }));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     type: "color",
 });
@@ -444,18 +427,9 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     max: "30",
 });
 (__VLS_ctx.size);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.clearDrawing) },
-    ...{ class: "clear-btn" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.undoAction) },
-    ...{ class: "undo-btn" },
-    disabled: (__VLS_ctx.lines.length === 0),
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.downloadImage) },
-});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)(__assign({ onClick: (__VLS_ctx.clearDrawing) }, { class: "clear-btn" }));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)(__assign(__assign({ onClick: (__VLS_ctx.undoAction) }, { class: "undo-btn" }), { disabled: (__VLS_ctx.lines.length === 0) }));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)(__assign({ onClick: (__VLS_ctx.downloadImage) }));
 /** @type {__VLS_StyleScopedClasses['draw-app']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas']} */ ;
 /** @type {__VLS_StyleScopedClasses['bg-canvas']} */ ;
@@ -472,8 +446,8 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 /** @type {__VLS_StyleScopedClasses['clear-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['undo-btn']} */ ;
 var __VLS_dollars;
-const __VLS_self = (await import('vue')).defineComponent({
-    setup() {
+var __VLS_self = (await import('vue')).defineComponent({
+    setup: function () {
         return {
             wrapper: wrapper,
             bgCanvas: bgCanvas,
@@ -502,7 +476,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     },
 });
 export default (await import('vue')).defineComponent({
-    setup() {
+    setup: function () {
         return {};
     },
 });
