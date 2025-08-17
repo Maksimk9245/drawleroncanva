@@ -8,5 +8,6 @@
     "strict": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true
-  }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "env.d.ts"]
 }
